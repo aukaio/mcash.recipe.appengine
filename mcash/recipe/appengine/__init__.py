@@ -384,10 +384,4 @@ class Recipe(Scripts):
         self.setup_bin()
         reqs, ws = self.working_set()
         self.copy_sources()
-        patch_file = options.get('patch')
-        patch_options = options.get('patch_options')
-        if patch_file:
-            if options.get('appengine-lib'):
-                raise Exception("patching preinstalled SDK not allowed")
-            self.patch_sdk(patch_options, patch_file)
         return ()
