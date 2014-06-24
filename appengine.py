@@ -223,7 +223,7 @@ class Recipe(Scripts):
         extra_paths += '\n' + gae
         self.options['extra-paths'] = extra_paths
         self.options['appserver-run-file'] = self.options.get(
-                                'appserver-run-file', '_run_file')
+                                'appserver-run-file', 'run_file')
 
         # Write server script
         gae_server = os.path.join(gae, self.get_appserver_script_name())
