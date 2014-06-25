@@ -143,7 +143,7 @@ class Recipe(Scripts):
 
         options = self.options.copy()
         options['eggs'] = ''
-        run_file = self.options['appserver-run-file']
+        run_file = '_' + self.options['appserver-run-file']
         options['entry-points'] = '%s=%s:%s' % (name, script_name, run_file)
         options['initialization'] = dev_appserver_initialization % dict(var=var, script_name=script_name)
         options['initialization'] += '\n' + self.options.get('initialization', '')
