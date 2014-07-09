@@ -265,7 +265,7 @@ class Recipe(Scripts):
             pkg_resources.write(egg_contents.read('pkg_resources.py'))
             pkg_resources.close()
 
-    def copy_packages(self, ws, lib):
+    def copy_packages(self, ws, lib, entries):
         """Copy egg contents to lib-directory."""
         if not os.path.exists(lib):
             os.mkdir(lib)
@@ -274,16 +274,6 @@ class Recipe(Scripts):
             self.write_pkg_resources(ws, lib)
         else:
             self.write_pkg_resources_stub(lib)
-        packages = self.options.get('packages', '').split()
-        keys = [k.lower() for k in packages]
-        for p in keys:
-            if p not in ws.by_key.keys():
-                raise KeyError, '%s: package not found.' % p
-        entries = {}
-        for k in ws.entry_keys:
-            key = ws.entry_keys[k][0]
-            if key in keys:
-                entries[packages[keys.index(key)]] = k
         for key in entries.keys():
             top_level = os.path.join(ws.by_key[key]._provider.egg_info,
                                      'top_level.txt')
@@ -348,6 +338,17 @@ class Recipe(Scripts):
             raise Exception("patching the SDK failed")
         return 0
 
+    def get_entries(self, ws, packages):
+        for p in packages:
+            if p not in ws.by_key.keys():
+                raise KeyError('{}: package not found.'.format(p))
+        entries = {}
+        for k in ws.entry_keys:
+            key = ws.entry_keys[k][0]
+            if key in packages:
+                entries[packages[packages.index(key)]] = k
+        return entries
+
     def install(self):
         """Creates the part."""
         options = self.options
@@ -364,7 +365,16 @@ class Recipe(Scripts):
             shutil.rmtree(app_dir, True)
         if not os.path.exists(app_dir):
             os.mkdir(app_dir)
-        self.copy_packages(ws, temp_dir)
+        packages = self.options.get('packages', '').split()
+        packages = [p.lower() for p in packages]
+        entries = self.get_entries(ws, packages)
+        not_zip_safe_packages = dict(filter(
+            lambda item: os.path.exists(os.path.join(ws.by_key[item[0]]._provider.egg_info, 'not-zip-safe')),
+            entries.iteritems()
+        ))
+        zip_safe_packages = {key: item for key, item in entries.iteritems() if key not in not_zip_safe_packages}
+        self.copy_packages(ws, temp_dir, zip_safe_packages)
+        self.copy_packages(ws, app_dir, not_zip_safe_packages)
         if options.get('zip-packages', 'YES').lower() in ['yes', 'true']:
             self.zip_packages(ws, temp_dir)
             if os.path.isdir(temp_dir):
