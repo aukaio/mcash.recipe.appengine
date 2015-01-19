@@ -65,9 +65,8 @@ def copytree(src, dst, symlinks=0, allowed_basenames=None, exclude=[]):
             continue
         try:
             if symlinks and os.path.islink(srcname):
-                linkto = os.readlink(srcname)
-                os.symlink(linkto, dstname)
-            elif os.path.isdir(srcname):
+                srcname = os.readlink(srcname)
+            if os.path.isdir(srcname):
                 copytree(srcname, dstname, symlinks, allowed_basenames, exclude)
             elif not os.path.isfile(dstname) and symlinks:
                 os.symlink(srcname, dstname)
