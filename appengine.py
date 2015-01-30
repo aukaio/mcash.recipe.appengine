@@ -28,6 +28,15 @@ os.environ['TMPDIR'] = mkvar()
 from %(script_name)s import *
 '''
 
+def remove(dstname):
+    """ Remove directories, files and links """
+    if os.path.isdir(dstname):
+        shutil.rmtree(dstname)
+    elif os.path.isfile(dstname) or os.path.islink(dstname):
+        # for a broken link isfile returns False
+        # that's why we double check with islink
+        os.remove(dstname)
+
 def copytree(src, dst, symlinks=0, allowed_basenames=None, exclude=[]):
     """Local implementation of shutil's copytree function.
 
@@ -66,12 +75,15 @@ def copytree(src, dst, symlinks=0, allowed_basenames=None, exclude=[]):
         try:
             if symlinks and os.path.islink(srcname):
                 srcname = os.readlink(srcname)
+
             if os.path.isdir(srcname):
                 copytree(srcname, dstname, symlinks, allowed_basenames, exclude)
-            elif not os.path.isfile(dstname) and symlinks:
-                os.symlink(srcname, dstname)
-            elif not symlinks:
-                shutil.copy2(srcname, dstname)
+            else:
+                if not symlinks:
+                    shutil.copy2(srcname, dstname)
+                elif not os.path.islink(dstname) or os.readlink(dstname) != srcname:
+                    remove(dstname)
+                    os.symlink(srcname, dstname)
         except (IOError, os.error), why:
             logging.error("Can't copy %s to %s: %s" %
                           (srcname, dstname, str(why)))
