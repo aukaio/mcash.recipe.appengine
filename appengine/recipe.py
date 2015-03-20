@@ -10,6 +10,9 @@ import zipfile
 from zc.buildout.buildout import Options
 from zc.recipe.egg import Eggs, Scripts
 
+__all__ = ['Recipe']
+
+
 logger = logging.getLogger(__name__)
 
 rx_setuptools = re.compile(

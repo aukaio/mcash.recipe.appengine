@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='mcash.recipe.appengine',
@@ -6,6 +6,6 @@ setup(
     author="mCASH Team",
     author_email="support@mca.sh",
     description="Buildout recipe for google appengine",
-    entry_points={'zc.buildout': ['default = appengine:Recipe']}
+    entry_points={'zc.buildout': ['default = appengine:Recipe']},
+    packages=['appengine']
 )
-
