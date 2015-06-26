@@ -192,28 +192,53 @@ class Recipe(Scripts):
 
     def install_appengine(self):
         """Downloads and installs Google App Engine."""
+        def parse_version(s):
+            p, _, ver = s.split('\n')[0].partition(':')
+            assert p == 'release', 'Could not parse GAE SDK version'
+            return ver.strip(' "')
+
         arch_filename = self.options['url'].split('/')[-1].split(os.sep)[-1]
         dst = os.path.join(self.buildout['buildout']['parts-directory'])
         downloads_dir = os.path.join(os.getcwd(), 'downloads')
         downloads_dir = self.buildout['buildout'].get('download-cache', downloads_dir)
+        tmpdir = None
         if not os.path.isdir(downloads_dir):
             os.mkdir(downloads_dir)
         src = os.path.join(downloads_dir, arch_filename)
         if not os.path.isfile(src):
+            if tmpdir is None:
+                tmpdir = tempfile.mkdtemp()
+            tmpdl = os.path.join(tmpdir, arch_filename)
             logger.info("downloading Google App Engine distribution...")
-            urllib.urlretrieve(self.options['url'], src)
+            urllib.urlretrieve(self.options['url'], tmpdl)
+            shutil.move(tmpdl, src)
         else:
             logger.info("Google App Engine distribution already downloaded.")
-        if os.path.isdir(os.path.join(dst, 'google_appengine')):
-            shutil.rmtree(os.path.join(dst, 'google_appengine'))
+        unpack = True
         arch = zipfile.ZipFile(open(src, "rb"))
-        for name in arch.namelist():
-            if name and name[-1] in (os.sep, '/'):
-                os.mkdir(os.path.join(dst, name))
+        if os.path.isdir(os.path.join(dst, 'google_appengine')):
+            version_in_zip = parse_version(arch.read('google_appengine/VERSION'))
+            with open(os.path.join(dst, 'google_appengine', 'VERSION')) as fd:
+                version_in_dst = parse_version(fd.read())
+            if version_in_zip != version_in_dst:
+                shutil.rmtree(os.path.join(dst, 'google_appengine'))
             else:
-                outfile = open(os.path.join(dst, name), 'wb')
-                outfile.write(arch.read(name))
-                outfile.close()
+                logger.info("Google App Engine distribution already installed.")
+                unpack = False
+        if unpack:
+            logger.info("installing Google App Engine distribution...")
+            if tmpdir is None:
+                tmpdir = tempfile.mkdtemp()
+            for name in arch.namelist():
+                if name and name[-1] in (os.sep, '/'):
+                    os.mkdir(os.path.join(tmpdir, name))
+                else:
+                    outfile = open(os.path.join(tmpdir, name), 'wb')
+                    outfile.write(arch.read(name))
+                    outfile.close()
+            shutil.move(os.path.join(tmpdir, 'google_appengine'), os.path.join(dst, 'google_appengine'))
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir)
 
     def setup_bin(self):
         """Setup bin scripts."""
