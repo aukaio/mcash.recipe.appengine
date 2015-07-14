@@ -267,38 +267,10 @@ class Recipe(Scripts):
         return self.options.get('appserver-script-name',
             self.default_appserver_script_name )
 
-    def write_pkg_resources_stub(self, d):
-        """Writes a stub for setuptool's pkg_resources module."""
-        pkg_resources_stub = open(os.path.join(d, 'pkg_resources.py'), "w")
-        pkg_resources_stub.write("def _dummy_func(*args):\n")
-        pkg_resources_stub.write("    pass\n\n")
-        pkg_resources_stub.write("declare_namespace = _dummy_func\n")
-        pkg_resources_stub.write("resource_filename = _dummy_func\n")
-        pkg_resources_stub.close()
-
-    def write_pkg_resources(self, ws, d):
-        """Write original pkg_resources.py file from setuptools egg."""
-        setuptools_eggs = [e for e in ws.entries if rx_setuptools.match(e)]
-        assert len(setuptools_eggs) == 1, "setuptools not found"
-        if os.path.isdir(setuptools_eggs[0]):
-            src = os.path.join(setuptools_eggs[0], 'pkg_resources.py')
-            dst = os.path.join(d, 'pkg_resources.py')
-            shutil.copyfile(src, dst)
-        else:
-            egg_contents = zipfile.ZipFile(setuptools_eggs[0])
-            pkg_resources = open(os.path.join(d, 'pkg_resources.py'), "w")
-            pkg_resources.write(egg_contents.read('pkg_resources.py'))
-            pkg_resources.close()
-
     def copy_packages(self, ws, lib, entries):
         """Copy egg contents to lib-directory."""
         if not os.path.exists(lib):
             os.mkdir(lib)
-        if self.options.get(
-                'use_setuptools_pkg_resources', 'false').lower() == "true":
-            self.write_pkg_resources(ws, lib)
-        else:
-            self.write_pkg_resources_stub(lib)
         for key in entries.keys():
             top_level = os.path.join(ws.by_key[key]._provider.egg_info,
                                      'top_level.txt')
