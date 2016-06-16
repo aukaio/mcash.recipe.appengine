@@ -290,7 +290,7 @@ class Recipe(Scripts):
             pkg_resources.write(egg_contents.read('pkg_resources.py'))
             pkg_resources.close()
 
-    def copy_packages(self, ws, lib, entries):
+    def copy_packages(self, ws, lib, entries, zip_packages):
         """Copy egg contents to lib-directory."""
         if not os.path.exists(lib):
             os.mkdir(lib)
@@ -300,12 +300,10 @@ class Recipe(Scripts):
         else:
             self.write_pkg_resources_stub(lib)
         for key in entries.keys():
-            top_level = os.path.join(ws.by_key[key]._provider.egg_info,
+            egg = ws.by_key[key]
+            top_level = os.path.join(egg._provider.egg_info,
                                      'top_level.txt')
-            top = open(top_level, 'r')
-            top_dir = top.read()
-            src = os.path.join(entries[key], top_dir.strip())
-            top.close()
+            src = entries[key]
             dir = os.path.join(lib, os.path.basename(src))
             egg_info_src = os.path.join(ws.by_key[key]._provider.egg_info,
                                         'SOURCES.txt')
@@ -313,24 +311,20 @@ class Recipe(Scripts):
             allowed_basenames = [os.path.basename(p.strip())
                                  for p in sources.readlines()]
             sources.close()
-            if not os.path.exists(dir) and os.path.exists(src):
-                os.mkdir(dir)
-            exclude = ['EGG-INFO'] # Exclude this every time
-            copytree(src, dir, hasattr(os, 'symlink'),
-                     allowed_basenames=allowed_basenames,
-                     exclude=exclude+self.options.get('exclude', '').split())
-
-    def zip_packages(self, ws, lib):
-        """Creates zip archive of configured packages."""
-
-        zip_name = self.options.get('zip-name', 'packages.zip')
-        zipper = Zipper(os.path.join(self.options['app-directory'],
-                                     zip_name), lib)
-        os.chdir(lib)
-        for root, dirs, files in os.walk('.'):
-            for f in files:
-                zipper.add(os.path.join(root, f))
-        zipper.close()
+            zip_safe = not os.path.exists(os.path.join(egg._provider.egg_info, 'not-zip-safe'))
+            if zip_safe and zip_packages:
+                if not os.path.exists(dir) and os.path.exists(src):
+                    zipper = Zipper(dir, src)
+                    for root, _, files in os.walk(src):
+                        for f in files:
+                            zipper.add(os.path.join(root, f))
+                    zipper.close()
+            else:
+                if not os.path.exists(dir) and os.path.exists(src):
+                    os.mkdir(dir)
+                    copytree(src, dir, hasattr(os, 'symlink'),
+                        allowed_basenames=allowed_basenames,
+                    )
 
     def copy_sources(self):
         """Copies the application sources."""
@@ -382,10 +376,8 @@ class Recipe(Scripts):
         self.setup_bin()
         reqs, ws = self.working_set()
         app_dir = options['app-directory']
-        if options.get('zip-packages', 'YES').lower() in ['yes', 'true']:
-            temp_dir = os.path.join(tempfile.mkdtemp(), self.name)
-        else:
-            temp_dir = app_dir
+        zip_packages = options.get('zip-packages', 'YES').lower() in ['yes', 'true']
+        packages_dir =  os.path.join(self.options['app-directory'], 'packages')
         if os.path.isdir(app_dir):
             shutil.rmtree(app_dir, True)
         if not os.path.exists(app_dir):
@@ -393,17 +385,7 @@ class Recipe(Scripts):
         packages = self.options.get('packages', '').split()
         packages = [p.lower() for p in packages]
         entries = self.get_entries(ws, packages)
-        not_zip_safe_packages = dict(filter(
-            lambda item: os.path.exists(os.path.join(ws.by_key[item[0]]._provider.egg_info, 'not-zip-safe')),
-            entries.iteritems()
-        ))
-        zip_safe_packages = {key: item for key, item in entries.iteritems() if key not in not_zip_safe_packages}
-        self.copy_packages(ws, temp_dir, zip_safe_packages)
-        self.copy_packages(ws, app_dir, not_zip_safe_packages)
-        if options.get('zip-packages', 'YES').lower() in ['yes', 'true']:
-            self.zip_packages(ws, temp_dir)
-            if os.path.isdir(temp_dir):
-                shutil.rmtree(temp_dir, True)
+        self.copy_packages(ws, packages_dir, entries, zip_packages=zip_packages)
         self.copy_sources()
         patch_file = options.get('patch')
         patch_options = options.get('patch-options')
